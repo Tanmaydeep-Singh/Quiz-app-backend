@@ -1,10 +1,10 @@
 const { Quiz, Question } = require('../models/Quiz');
 const { User } = require('../models/User');
 
+// Get all quizzes
 const getAllQuizzes = async (req, res) => {
   try {
     const quizzes = await Quiz.find().populate('createdBy', 'username').exec();
-    
     res.status(200).json({
       quizzes: quizzes.map(quiz => ({
         quizId: quiz._id,
@@ -19,19 +19,17 @@ const getAllQuizzes = async (req, res) => {
   }
 };
 
-
 const createQuiz = async (req, res) => {
   const { title, description, questionIds } = req.body;
-  const userId = req.user.id; 
-  
+  const userId = req.user.id;
+
   try {
     const quiz = new Quiz({
       title,
       description,
-      questions: questionIds, 
+      questions: questionIds,
       createdBy: userId,
     });
-    
 
     await quiz.save();
 
@@ -44,64 +42,73 @@ const createQuiz = async (req, res) => {
   }
 };
 
+// Start the quiz and return all questions
 const startQuiz = async (req, res) => {
-  const { quizId, userId } = req.body;
+  const { quizId } = req.body;
 
   try {
     const quiz = await Quiz.findById(quizId).populate('questions').exec();
-    const question = quiz.questions[0];
+    
+    // Make sure there are questions
+    if (!quiz.questions || quiz.questions.length === 0) {
+      return res.status(404).json({ message: "No questions available to start the quiz" });
+    }
 
+    // Return all questions to the frontend
     res.status(200).json({
-      questionId: question._id,
-      questionText: question.questionText,
-      options: question.options,
-      difficulty: question.difficulty,
+      questions: quiz.questions.map(question => ({
+        questionId: question._id,
+        questionText: question.questionText,
+        options: question.options,
+        difficulty: question.difficulty,
+      })),
     });
   } catch (err) {
     res.status(500).json({ message: "Error starting quiz", error: err.message });
   }
 };
 
-const submitAnswer = async (req, res) => {
-  const { quizId, userId, questionId, selectedAnswer } = req.body;
+// Submit all answers and calculate result
+const submitQuiz = async (req, res) => {
+  const { quizId, answers } = req.body; // 'answers' is an array of {questionId, selectedAnswer}
 
   try {
     const quiz = await Quiz.findById(quizId).populate('questions').exec();
-    const question = quiz.questions.find(q => q._id.toString() === questionId);
 
-    if (!question) {
-      return res.status(404).json({ message: "Question not found" });
-    }
-
-    const isCorrect = selectedAnswer === question.correctAnswer;
-
-    const newDifficulty = isCorrect ? 'hard' : 'easy';
-    
-    let user = await User.findById(userId);
-    user.totalScore += isCorrect ? 1 : 0;
-    await user.save();
-
-    const leaderboardUpdate = {
-      user: userId,
-      score: user.totalScore,
-    };
-
-    await Quiz.findByIdAndUpdate(quizId, {
-      $push: { leaderboard: leaderboardUpdate },
-      $set: { averageScore: calculateAverageScore(quizId) }, 
+    // Calculate score based on the answers
+    let score = 0;
+    answers.forEach(answer => {
+      const question = quiz.questions.find(q => q._id.toString() === answer.questionId);
+      if (question && question.correctAnswer === answer.selectedAnswer) {
+        score += 1;
+      }
     });
 
-    const nextQuestion = quiz.questions.find(q => q.difficulty === newDifficulty);
+    // Calculate average score
+    const totalScores = quiz.leaderboard.reduce((sum, entry) => sum + entry.score, 0);
+    const averageScore = quiz.leaderboard.length > 0 ? totalScores / quiz.leaderboard.length : 0;
+
+    // Save the user's score to the leaderboard
+    quiz.leaderboard.push({ user: req.user.id, score });
+    await quiz.save();
+
+    // Sort the leaderboard by score
+    const sortedLeaderboard = quiz.leaderboard.sort((a, b) => b.score - a.score);
+
+    // Calculate the user's rank
+    const userRank = sortedLeaderboard.findIndex(entry => entry.user.toString() === req.user.id) + 1;
 
     res.status(200).json({
-      nextQuestionId: nextQuestion._id,
-      nextQuestionText: nextQuestion.questionText,
-      options: nextQuestion.options,
-      difficulty: nextQuestion.difficulty,
-      score: isCorrect ? 1 : 0,
+      score,
+      averageScore,
+      rank: userRank,
+      leaderboard: sortedLeaderboard.map(entry => ({
+        user: entry.user.username,
+        score: entry.score,
+      })),
     });
   } catch (err) {
-    res.status(500).json({ message: "Error submitting answer", error: err.message });
+    res.status(500).json({ message: "Error submitting quiz", error: err.message });
   }
 };
 
@@ -110,12 +117,11 @@ const getLeaderboard = async (req, res) => {
 
   try {
     const quiz = await Quiz.findById(quizId).populate('leaderboard.user').exec();
-
     const sortedLeaderboard = quiz.leaderboard.sort((a, b) => b.score - a.score);
 
     res.status(200).json({
       leaderboard: sortedLeaderboard.map(entry => ({
-        user: entry.user.name,
+        user: entry.user.username,
         score: entry.score,
       })),
     });
@@ -124,17 +130,10 @@ const getLeaderboard = async (req, res) => {
   }
 };
 
-const calculateAverageScore = async (quizId) => {
-  const quiz = await Quiz.findById(quizId).populate('leaderboard.user').exec();
-  const totalScores = quiz.leaderboard.reduce((sum, entry) => sum + entry.score, 0);
-  return totalScores / quiz.leaderboard.length || 0;
-};
-
-
 module.exports = {
   getAllQuizzes,
   createQuiz,
   startQuiz,
-  submitAnswer,
-  getLeaderboard
+  submitQuiz,
+  getLeaderboard,
 };

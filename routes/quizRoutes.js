@@ -1,9 +1,9 @@
 const express = require('express');
 const {
-  getAllQuizzes,
   createQuiz,
+  getAllQuizzes,
   startQuiz,
-  submitAnswer,
+  submitQuiz,
   getLeaderboard,
 } = require('../controllers/quizController');
 const { protect } = require('../middleware/authMiddleware');
@@ -16,7 +16,7 @@ router.post('/create', protect, createQuiz);
 
 router.post('/start', protect, startQuiz);
 
-router.post('/:quizId/answer', protect, submitAnswer);
+router.post('/:quizId/submit', protect, submitQuiz);
 
 router.get('/:quizId/leaderboard', getLeaderboard);
 
