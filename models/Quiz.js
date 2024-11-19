@@ -1,21 +1,41 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
+const { Schema } = mongoose;
 
-const quizSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  subject: { type: String, required: true },
-  description: { type: String },
-  questions: [
-    {
-      question: { type: String, required: true },
-      options: [{ type: String }],
-      correctAnswer: { type: String, required: true },
-      difficulty: { type: String, enum: ["easy", "medium", "hard"], required: true },
+const questionSchema = new Schema(
+  {
+    questionText: { type: String, required: true },
+    options: { type: [String], required: true },
+    correctAnswer: { type: String, required: true },
+    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
+    topic: { type: String },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,  
     },
-  ],
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  createdAt: { type: Date, default: Date.now },
-  totalAttempts: { type: Number, default: 0 }, // Number of times this quiz has been attempted
-  averageScore: { type: Number, default: 0 }, // Average score for this quiz
-});
+  },
+  { timestamps: true }
+);
 
-module.exports = mongoose.model("Quiz", quizSchema);
+const Question = mongoose.model('Question', questionSchema);
+
+const quizSchema = new Schema(
+  {
+    title: { type: String, required: true },
+    description: { type: String },
+    questions: [{ type: Schema.Types.ObjectId, ref: 'Question' }], 
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    averageScore: { type: Number, default: 0 }, 
+    leaderboard: [
+      {
+        user: { type: Schema.Types.ObjectId, ref: 'User' },
+        score: { type: Number },
+      },
+    ], // Track user score for the leaderboard
+  },
+  { timestamps: true }
+);
+
+const Quiz = mongoose.model('Quiz', quizSchema);
+
+module.exports = { Quiz, Question };

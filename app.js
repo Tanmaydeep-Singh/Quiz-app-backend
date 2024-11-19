@@ -10,10 +10,16 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
+const authRoutes = require("./routes/authRouter");
 const userRoutes = require("./routes/userRoutes");
+const questionRoutes = require("./routes/questionRouter");
 const quizRoutes = require("./routes/quizRoutes");
 
+
+
+app.use("/api/auth", authRoutes); 
 app.use("/api/users", userRoutes); 
+app.use("/api/question", questionRoutes);
 app.use("/api/quizzes", quizRoutes);
 
 app.get("/", (req, res) => {
