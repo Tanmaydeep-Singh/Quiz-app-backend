@@ -8,6 +8,14 @@ const userSchema = new Schema(
     password: { type: String, required: true },
     quizzesAttempted: [{ type: Schema.Types.ObjectId, ref: 'Quiz' }],
     totalScore: { type: Number, default: 0 },
+    recentActivities: [
+      {
+        quiz: { type: Schema.Types.ObjectId, ref: 'Quiz' }, 
+        title: {type:String},
+        score: { type: Number },  
+        attemptedAt: { type: Date, default: Date.now },
+      }
+    ],
   },
   { timestamps: true }
 );

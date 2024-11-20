@@ -58,9 +58,31 @@ const updateUserRank = async (req, res) => {
   }
 };
 
+const getUserRecentActivities = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).populate({
+      path: 'quizzesAttempted.quiz',  
+      select: 'title questions'  
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const recentActivities = user.recentActivities;
+
+    res.status(200).json({ recentActivities });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching recent activities', error });
+  }
+};
+
+
 module.exports = {
   getUserProfile,
   getUserQuizzesCreated,
   getUserQuizzesAttempted,
-  updateUserRank
+  updateUserRank,
+  getUserRecentActivities
 };
+
